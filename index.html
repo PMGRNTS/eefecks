@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SFX Forge</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2216%22 fill=%22%23ff4f00%22/%3E%3Cpath d=%22M12 9v14l11-7z%22 fill=%22%23111%22/%3E%3C/svg%3E">
+<meta name="description" content="Layered procedural sound effects generator for games: weapons, impacts, UI and abilities, with variations and WAV export.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+
+</head>
+<body>
+<header class="top">
+  <h1>SFX Forge</h1>
+  <p><kbd>Space</kbd> play · <kbd>G</kbd> new take · <kbd>M</kbd> mutate · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo</p>
+</header>
+<div class="app">
+  <aside class="gens panel">
+    <h2>Generate</h2>
+    <div class="groups" id="groups"></div>
+    <div class="libwrap">
+      <h3>Saved sounds</h3>
+      <div class="row"><button class="btn" id="save" style="flex:1">Save current</button></div>
+      <div class="lib" id="lib"></div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="stage">
+      <div class="screen">
+        <div class="stop">
+          <button class="play" id="play" aria-label="Play sound"><svg width="20" height="22" viewBox="0 0 20 22"><path d="M2 1.5v19L19 11z" fill="#111"/></svg></button>
+          <input class="sname" id="sname" aria-label="Sound name">
+          <div class="vol"><span>Monitor</span><input type="range" id="vol" min="0" max="1000" value="700" aria-label="Monitor volume"></div>
+          <div class="vseg" id="view"><button data-v="wave" aria-pressed="true">Wave</button><button data-v="spec" aria-pressed="false">Spectrum</button></div>
+        </div>
+        <div class="fig" id="fig"><canvas id="cv"></canvas></div>
+        <div class="lanes" id="lanesw"><canvas id="lanes"></canvas></div>
+        <div class="ro" id="ro"></div>
+      </div>
+      <div class="acts">
+        <button class="btn pri" id="regen">New take</button>
+        <button class="btn" id="mutate">Mutate</button>
+        <button class="btn" id="undo" aria-label="Undo">Undo</button>
+        <button class="btn" id="redo" aria-label="Redo">Redo</button>
+        <span class="sp"></span>
+        <label class="chk"><input type="checkbox" id="auto" checked> Play on change</label>
+        <input class="txt seed" id="seed" inputmode="numeric" aria-label="Seed">
+      </div>
+    </div>
+    <div class="lhead">
+      <h2>Layers</h2>
+      <div class="row" id="add">
+        <button class="btn" data-t="osc">+ Tone</button>
+        <button class="btn" data-t="noise">+ Noise</button>
+        <button class="btn" data-t="metal">+ Metal</button>
+        <button class="btn" data-t="string">+ String</button>
+      </div>
+    </div>
+    <div id="layers"></div>
+  </main>
+
+  <aside>
+    <section class="panel"><h2>Master bus</h2><div id="master"></div></section>
+    <section class="panel">
+      <h2>Variations</h2>
+      <div id="varctl"></div>
+      <div class="tiles" id="tiles"></div>
+      <div class="row" style="margin-top:8px"><button class="btn" id="newtakes">Reshuffle</button></div>
+      <h3>Rapid-fire test</h3>
+      <div id="rfctl"></div>
+      <div class="row"><button class="btn pri" id="burst">Fire burst</button></div>
+      <p class="note">Plays the variations round-robin at your fire rate, so you hear how the sound stacks under automatic fire.</p>
+    </section>
+    <section class="panel">
+      <h2>Export</h2>
+      <h3>Sample rate</h3><div class="seg" id="xsr"><button data-v="44100">44.1 kHz</button><button data-v="48000">48 kHz</button></div>
+      <h3>Bit depth</h3><div class="seg" id="xbits"><button data-v="16">16-bit</button><button data-v="24">24-bit</button><button data-v="32">32 float</button></div>
+      <div style="display:grid;gap:6px;margin-top:12px">
+        <button class="btn pri" id="xwav">Download WAV</button>
+        <button class="btn" id="xpack">Download variation pack</button>
+        <button class="btn" id="xkit">Download game kit (engine + presets)</button>
+        <div class="row"><button class="btn" id="xcopy" style="flex:1">Copy preset JSON</button><button class="btn" id="ximp" style="flex:1">Import JSON</button></div>
+      </div>
+      <p class="note" id="xnote">Channels follow the Mono switch on the master bus. Mono is usually right for sounds your engine positions in 3D.</p>
+    </section>
+  </aside>
+</div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="mtitle">
+  <div class="panel">
+    <h2 id="mtitle">Preset JSON</h2>
+    <textarea id="mtext" spellcheck="false" aria-label="Preset JSON"></textarea>
+    <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn" id="mclose">Close</button><button class="btn pri" id="mload">Load preset</button></div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="js/sfx-engine.js"></script>
+<script src="js/generators.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
