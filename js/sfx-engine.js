@@ -1,4 +1,4 @@
-/* SFX Forge engine — deterministic layered sound synthesis in plain JS.
+/* eefecks engine — deterministic layered sound synthesis in plain JS.
    render(sound, {sr}) -> {L, R, sr, spans, peak, rms}. No dependencies. */
 (function (root) {
   'use strict';
@@ -32,14 +32,16 @@
     metal: { mode: 'bar', f0: 800, partials: 6, ring: 500, damp: 1, tilt: 1, spread: 0.01, dec: 800, curve: 1.5 },
     string: { f0: 220, ring: 800, bright: 0.5, pick: 0.7, dec: 1200, curve: 1.2 },
     pulse: { f0: 30, f1: 30, sweep: 300, sweepCurve: 2, pShape: 'noise', width: 4, tone: 180, pJit: 0, accent: 0, dec: 600, curve: 1.5 },
-    bubble: { f0: 600, scatter: 1, density: 12, rise: 0.8, ring: 40, dec: 600, curve: 1.5 }
+    bubble: { f0: 600, scatter: 1, density: 12, rise: 0.8, ring: 40, dec: 600, curve: 1.5 },
+    formant: { f0: 140, f1: 140, sweep: 300, sweepCurve: 2, vibRate: 5, vibDepth: 0, vibShape: 'sine', vow0: 0, vow1: 3, vowT: 300, size: 1, breath: 0.1, rough: 0, syll: 0, scatter: 0.3, atk: 10, hold: 200, dec: 300, curve: 2 }
   };
   var MASTER = {
     pitch: 0, time: 1, gain: 0, drive: 0, lowcut: 20, highcut: 20000,
     compThr: 0, compRatio: 1, compAtk: 2, compRel: 120,
     revMix: 0, revSize: 0.5, revDamp: 0.5, revPre: 10,
     echoMix: 0, echoTime: 180, echoFb: 0.3, echoPP: true,
-    width: 1, norm: -1, mono: false
+    width: 1, norm: -1, mono: false,
+    loop: false, loopStart: 300, loopLen: 2000, loopXf: 200
   };
   var uid = 0;
   function newLayer(type, o) {
@@ -226,7 +228,44 @@
       t += -Math.log(1 - r() * 0.999) / rate;
     }
   }
-  var SOURCES = { osc: srcOsc, noise: srcNoise, metal: srcMetal, string: srcString, pulse: srcPulse, bubble: srcBubble };
+  /* Voice: a glottal saw (plus breath noise) through three vowel formants. Vowels a-e-i-o-u map to 0-4.
+     size > 1 is a bigger throat (lower formants). syll > 0 switches to gibberish speech: random vowels and
+     inflection per syllable, with a consonant-like noise burst at each onset. rough adds pitch jitter and vocal fry. */
+  var VOW = [[730, 1090, 2440], [530, 1840, 2480], [270, 2290, 3010], [570, 840, 2410], [300, 870, 2240]];
+  var FBW = [90, 110, 150], FG = [1, 0.6, 0.35];
+  function srcFormant(l, out, sr, pm, tm, r) {
+    var N = out.length, f0 = l.f0 * pm, f1 = l.f1 * pm, sw = Math.max(0.0005, l.sweep * tm / 1000), sc = l.sweepCurve, lr = Math.log(f1 / f0);
+    var vT = Math.max(1, l.vowT) * tm / 1000, fs = pm / clamp(l.size, 0.3, 3), br = clamp(l.breath, 0, 1), ro = clamp(l.rough, 0, 1);
+    var syl = l.syll >= 0.25 ? l.syll / tm : 0, spread = Math.max(0, l.scatter), v0 = clamp(l.vow0, 0, 4), v1 = clamp(l.vow1, 0, 4);
+    var vd = l.vibDepth / 1200, vib = vd > 0 ? lfo(l.vibShape, l.vibRate, l.vibShape === 'wander' || l.vibShape === 'step' ? rng((r() * 4294967296) >>> 0) : null) : null;
+    var bp = [new SVF(), new SVF(), new SVF()], F = [0, 0, 0], k, ph = 0, sub = 0, rj = 1;
+    var sylS = 0, sylE = 0, vCur = v0, vTar = v0, pCur = 1, pTar = 1, gl = 1 - Math.exp(-1 / (0.025 * sr)), bdk = 0.012 * sr * tm;
+    var nyq = sr * 0.45, mix = 1 - br * 0.85, nmix = br * 2.2;
+    for (var i = 0; i < N; i++) {
+      var t = i / sr, p = t < sw ? t / sw : 1, f = f0 * Math.exp(lr * (1 - Math.pow(1 - p, sc))), amp = 1, vow, burst = 0;
+      if (vib) f *= Math.pow(2, vd * vib(t));
+      if (syl) {
+        if (i >= sylE) { sylS = i; sylE = i + Math.max(16, Math.round(sr / syl * (0.6 + 0.8 * r()))); vTar = v0 + (v1 - v0) * r(); pTar = Math.pow(2, (r() * 2 - 1) * spread); }
+        vCur += (vTar - vCur) * gl; pCur += (pTar - pCur) * gl;
+        var u = (i - sylS) / (sylE - sylS);
+        amp = u < 0.12 ? u / 0.12 : u > 0.72 ? Math.max(0, (1 - u) / 0.28) : 1;
+        burst = Math.exp(-(i - sylS) / bdk);
+        vow = vCur; f *= pCur;
+      } else { var q = Math.min(1, t / vT); q = q * q * (3 - 2 * q); vow = v0 + (v1 - v0) * q; }
+      if ((i & 15) === 0) {
+        var vi = Math.min(3, Math.floor(vow)), vf = vow - vi;
+        for (k = 0; k < 3; k++) { F[k] = VOW[vi][k] * (1 - vf) + VOW[vi + 1][k] * vf; bp[k].set(F[k] * fs, F[k] / FBW[k], sr); }
+      }
+      var dt = Math.min(0.45, Math.min(f, nyq) * rj / sr);
+      var y = 2 * ph - 1 - blep(ph, dt);
+      if (ro > 0 && sub) y *= 1 - ro * 0.6;
+      ph += dt; if (ph >= 1) { ph -= 1; sub ^= 1; if (ro > 0) rj = 1 + (r() * 2 - 1) * ro * 0.06; }
+      var x = (y * mix + (r() * 2 - 1) * (nmix + burst * 0.7)) * amp, o = 0;
+      for (k = 0; k < 3; k++) o += bp[k].run(x, 'bp') * FG[k];
+      out[i] = o * 2.4;
+    }
+  }
+  var SOURCES = { osc: srcOsc, noise: srcNoise, metal: srcMetal, string: srcString, pulse: srcPulse, bubble: srcBubble, formant: srcFormant };
 
   /* ---------- one hit of a layer ---------- */
   function hit(l, sr, pm, tm, seed) {
@@ -330,6 +369,13 @@
     var revTail = M.revMix > 0.001 ? 0.25 + M.revSize * 4.5 + M.revPre / 1000 : 0;
     var echoTail = M.echoMix > 0.001 ? Math.min(4, M.echoTime / 1000 * Math.log(0.001) / Math.log(clamp(M.echoFb, 0.01, 0.95))) : 0;
     var total = Math.min(Math.round(sr * 10), Math.max(Math.round(sr * 0.02), end + Math.round((Math.max(revTail, echoTail) + 0.03) * sr)));
+    // seamless loop: keep [s, s+n) and crossfade what follows the loop end into its start
+    var lp = null;
+    if (M.loop) {
+      lp = { s: Math.round(clamp(M.loopStart, 0, 10000) / 1000 * sr), n: Math.round(clamp(M.loopLen, 50, 10000) / 1000 * sr) };
+      lp.x = Math.max(1, Math.min(Math.round(clamp(M.loopXf, 1, 5000) / 1000 * sr), lp.n >> 1));
+      total = lp.s + lp.n + lp.x;
+    }
     var L = new Float32Array(total), R = new Float32Array(total), n, i;
     tracks.forEach(function (t) { for (var i = 0; i < t.buf.length && t.start + i < total; i++) { var x = t.buf[i]; L[t.start + i] += x * t.gL; R[t.start + i] += x * t.gR; } });
 
@@ -359,21 +405,34 @@
       if (Math.abs(M.width - 1) > 0.001) { for (n = 0; n < total; n++) { var mid = (L[n] + R[n]) * 0.5, side = (L[n] - R[n]) * 0.5 * M.width; L[n] = mid + side; R[n] = mid - side; } }
     }
     if (M.mono) for (n = 0; n < total; n++) { L[n] = R[n] = (L[n] + R[n]) * 0.5; }
+    if (lp) {
+      var LL = L.slice(lp.s, lp.s + lp.n), RR = R.slice(lp.s, lp.s + lp.n);
+      for (i = 0; i < lp.x; i++) {
+        var a = (i + 0.5) / lp.x * Math.PI / 2, gi = Math.sin(a), go = Math.cos(a);
+        LL[i] = LL[i] * gi + L[lp.s + lp.n + i] * go; RR[i] = RR[i] * gi + R[lp.s + lp.n + i] * go;
+      }
+      L = LL; R = RR; total = lp.n;
+      spans.forEach(function (sp) { sp.start -= lp.s / sr; sp.end -= lp.s / sr; });
+    }
     pk = 0;
     for (n = 0; n < total; n++) pk = Math.max(pk, Math.abs(L[n]), Math.abs(R[n]));
     if (pk > 0 && M.norm != null) { var ng = dbToLin(M.norm) / pk; for (n = 0; n < total; n++) { L[n] *= ng; R[n] *= ng; } pk = dbToLin(M.norm); }
-    var th = pk * dbToLin(-70), last = 0;
-    for (n = total - 1; n >= 0; n--) if (Math.abs(L[n]) > th || Math.abs(R[n]) > th) { last = n; break; }
-    var len2 = Math.min(total, Math.max(last + Math.round(0.01 * sr), Math.round(end * 1)));
-    len2 = Math.max(len2, Math.round(0.02 * sr));
-    L = L.slice(0, len2); R = R.slice(0, len2);
-    var fade = Math.min(len2, Math.round(0.008 * sr));
-    for (i = 0; i < fade; i++) { var fg = i / fade; L[len2 - 1 - i] *= fg; R[len2 - 1 - i] *= fg; }
+    var len2 = total;
+    if (!lp) {
+      var th = pk * dbToLin(-70), last = 0;
+      for (n = total - 1; n >= 0; n--) if (Math.abs(L[n]) > th || Math.abs(R[n]) > th) { last = n; break; }
+      len2 = Math.min(total, Math.max(last + Math.round(0.01 * sr), Math.round(end * 1)));
+      len2 = Math.max(len2, Math.round(0.02 * sr));
+      L = L.slice(0, len2); R = R.slice(0, len2);
+      var fade = Math.min(len2, Math.round(0.008 * sr));
+      for (i = 0; i < fade; i++) { var fg = i / fade; L[len2 - 1 - i] *= fg; R[len2 - 1 - i] *= fg; }
+    }
     // short-term level: loudest 100 ms RMS window
     var W = Math.round(0.1 * sr), acc = 0, best = 0;
     for (n = 0; n < len2; n++) { var sq = (L[n] * L[n] + R[n] * R[n]) * 0.5; acc += sq; if (n >= W) { var o2 = n - W; acc -= (L[o2] * L[o2] + R[o2] * R[o2]) * 0.5; } best = Math.max(best, acc); }
+    if (lp && len2 < W) best = acc;
     var rms = Math.sqrt(best / Math.min(W, len2));
-    return { L: L, R: R, sr: sr, spans: spans, peak: pk, rms: rms, mono: !!M.mono, duration: len2 / sr };
+    return { L: L, R: R, sr: sr, spans: spans, peak: pk, rms: rms, mono: !!M.mono, loop: !!lp, duration: len2 / sr };
   }
 
   /* ---------- variation: a subtly different take, for round-robin playback ---------- */
@@ -450,7 +509,7 @@
     return b;
   }
 
-  var api = { render: render, vary: vary, newLayer: newLayer, newSound: newSound, rng: rng, encodeWav: encodeWav, zip: zip, toAudioBuffer: toAudioBuffer, COMMON: COMMON, TYPE_DEFAULTS: TYPE_DEFAULTS, MASTER: MASTER, version: '1.1' };
+  var api = { render: render, vary: vary, newLayer: newLayer, newSound: newSound, rng: rng, encodeWav: encodeWav, zip: zip, toAudioBuffer: toAudioBuffer, COMMON: COMMON, TYPE_DEFAULTS: TYPE_DEFAULTS, MASTER: MASTER, version: '1.2' };
   root.SFXEngine = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof self !== 'undefined' ? self : this);

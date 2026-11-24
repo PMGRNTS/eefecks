@@ -16,19 +16,22 @@ const PL = {
   wave: null, f0: p('Start pitch', 20, 12000, 'log', 'Hz'), f1: p('End pitch', 20, 12000, 'log', 'Hz'), sweep: p('Sweep time', 1, 3000, 'pow', 'ms'), sweepCurve: p('Sweep shape', 0.2, 8, 'log', 'n2'),
   pw: p('Pulse width', 0.05, 0.95, 'lin', '%'), jumpT: p('Jump at', 0, 1000, 'pow', 'ms'), jumpSemi: p('Jump', -24, 24, 'lin', 'st', 1),
   fmRatio: p('FM ratio', 0.25, 12, 'log', 'n2'), fmIndex: p('FM index', 0, 20, 'pow', 'n2'), fmDecay: p('FM decay', 5, 5000, 'log', 'ms'),
-  uni: p('Unison', 1, 7, 'lin', 'v', 1), detune: p('Detune', 0, 100, 'lin', 'ct'), vibRate: p('Vibrato rate', 0.5, 30, 'log', 'Hz'), vibDepth: p('Vibrato', 0, 200, 'pow', 'ct'),
+  uni: p('Unison', 1, 7, 'lin', 'v', 1), detune: p('Detune', 0, 100, 'lin', 'ct'), vibRate: p('Vibrato rate', 0.5, 30, 'log', 'Hz'), vibDepth: p('Vibrato', 0, 1200, 'pow', 'ct'),
   density: p('Crackle rate', 10, 20000, 'log', '/s'),
   partials: p('Partials', 1, 16, 'lin', 'n', 1), ring: p('Ring', 5, 6000, 'pow', 'ms'), damp: p('HF damping', 0, 2, 'lin', 'n2'), tilt: p('Tilt', 0, 2, 'lin', 'n2'), spread: p('Inharmonic', 0, 0.1, 'lin', 'n3'),
   bright: p('Brightness', 0, 1, 'lin', '%'), pick: p('Pick tone', 0, 1, 'lin', '%'),
   fMod: p('Motion', 0, 4, 'lin', 'oct', 0.05), fModRate: p('Motion rate', 0.05, 40, 'log', 'Hz'),
   width: p('Pulse length', 0.05, 100, 'log', 'ms'), tone: p('Pulse tone', 20, 8000, 'log', 'Hz'), pJit: p('Irregular', 0, 1, 'lin', '%'), accent: p('Accent', 0, 1, 'lin', '%'),
-  scatter: p('Pitch spread', 0, 4, 'lin', 'oct', 0.05), rise: p('Rise', 0, 3, 'lin', 'oct', 0.05)
+  scatter: p('Pitch spread', 0, 4, 'lin', 'oct', 0.05), rise: p('Rise', 0, 3, 'lin', 'oct', 0.05),
+  vow0: p('Start vowel', 0, 4, 'lin', 'vow', 0.01), vow1: p('End vowel', 0, 4, 'lin', 'vow', 0.01), vowT: p('Vowel glide', 1, 3000, 'pow', 'ms'),
+  size: p('Throat size', 0.4, 2.5, 'log', 'x'), breath: p('Breath', 0, 1, 'lin', '%'), rough: p('Roughness', 0, 1, 'lin', '%'), syll: p('Speech', 0, 20, 'lin', 'syl', 0.5)
 };
 /* per-type overrides of a shared key's label and range */
 const PT = {
   metal: { f0: { l: 'Pitch' } }, string: { f0: { l: 'Pitch' } },
   pulse: { f0: p('Start rate', 0.5, 2000, 'log', '/s'), f1: p('End rate', 0.5, 2000, 'log', '/s'), sweep: { l: 'Rate sweep' }, sweepCurve: { l: 'Sweep shape' } },
-  bubble: { f0: p('Pitch', 60, 8000, 'log', 'Hz'), density: p('Bubbles', 0.5, 500, 'log', '/s'), ring: p('Bubble length', 2, 400, 'log', 'ms') }
+  bubble: { f0: p('Pitch', 60, 8000, 'log', 'Hz'), density: p('Bubbles', 0.5, 500, 'log', '/s'), ring: p('Bubble length', 2, 400, 'log', 'ms') },
+  formant: { f0: { l: 'Start pitch' }, scatter: p('Intonation', 0, 2, 'lin', 'oct', 0.05) }
 };
 const pdef = (t, k) => { const o = (PT[t] || {})[k]; return o ? Object.assign({}, PL[k], o) : PL[k]; };
 const PM = {
@@ -37,7 +40,8 @@ const PM = {
   compThr: p('Threshold', -40, 0, 'lin', 'dB', 0.1), compRatio: p('Ratio', 1, 20, 'log', ':1'), compAtk: p('Attack', 0.1, 100, 'log', 'ms'), compRel: p('Release', 10, 1000, 'log', 'ms'),
   echoMix: p('Echo', 0, 1, 'lin', '%'), echoTime: p('Time', 10, 1000, 'log', 'ms'), echoFb: p('Feedback', 0, 0.9, 'lin', '%'),
   revMix: p('Reverb', 0, 1, 'lin', '%'), revSize: p('Size', 0, 1, 'lin', '%'), revDamp: p('Damping', 0, 1, 'lin', '%'), revPre: p('Pre-delay', 0, 200, 'pow', 'ms'),
-  width: p('Width', 0, 2, 'lin', '%'), norm: p('Peak', -24, 0, 'lin', 'dB', 0.1)
+  width: p('Width', 0, 2, 'lin', '%'), norm: p('Peak', -24, 0, 'lin', 'dB', 0.1),
+  loopStart: p('Loop start', 0, 6000, 'pow', 'ms'), loopLen: p('Loop length', 50, 8000, 'pow', 'ms'), loopXf: p('Crossfade', 1, 2000, 'pow', 'ms')
 };
 const OPTS = {
   wave: [['sine', 'Sine'], ['triangle', 'Tri'], ['saw', 'Saw'], ['square', 'Square']],
@@ -56,15 +60,21 @@ const SRC = {
   metal: ['seg:mode', 'f0', 'partials', 'ring', 'damp', 'tilt', 'spread'],
   string: ['f0', 'ring', 'bright', 'pick'],
   pulse: ['seg:pShape', 'f0', 'f1', 'sweep', 'sweepCurve', 'width', 'tone', 'pJit', 'accent'],
-  bubble: ['f0', 'scatter', 'density', 'rise', 'ring']
+  bubble: ['f0', 'scatter', 'density', 'rise', 'ring'],
+  formant: ['f0', 'f1', 'sweep', 'sweepCurve', 'seg:vibShape', 'vibRate', 'vibDepth', 'rough', 'breath']
 };
-const TNAME = { osc: 'Tone', noise: 'Noise', metal: 'Metal', string: 'String', pulse: 'Pulse', bubble: 'Bubble' };
-const LSEC = t => [['Source', SRC[t]]].concat(t === 'osc' ? [['FM and unison', ['fmRatio', 'fmIndex', 'fmDecay', 'uni', 'detune', 'seg:vibShape', 'vibRate', 'vibDepth']]] : [],
+const TNAME = { osc: 'Tone', noise: 'Noise', metal: 'Metal', string: 'String', pulse: 'Pulse', bubble: 'Bubble', formant: 'Voice' };
+const EXTRA = {
+  osc: [['FM and unison', ['fmRatio', 'fmIndex', 'fmDecay', 'uni', 'detune', 'seg:vibShape', 'vibRate', 'vibDepth']]],
+  formant: [['Vowels and speech', ['vow0', 'vow1', 'vowT', 'size', 'syll', 'scatter']]]
+};
+const LSEC = t => [['Source', SRC[t]]].concat(EXTRA[t] || [],
   [['Envelope', ['seg:dir', 'atk', 'hold', 'dec', 'curve']], ['Filter', ['seg:fType', 'cut', 'q', 'fEnv', 'fEnvT', 'seg:fModShape', 'fMod', 'fModRate']], ['Tremolo', ['seg:tremShape', 'trem', 'tremRate']],
    ['Grit', ['drive', 'bits', 'ds']], ['Repeat', ['rep', 'repInt', 'repDecay', 'repPitch', 'repJit']], ['Mix', ['gain', 'pan', 'delay']]]);
 const MSEC = [['Character', ['pitch', 'time', 'gain', 'drive']], ['Tone', ['lowcut', 'highcut']], ['Dynamics', ['compThr', 'compRatio', 'compAtk', 'compRel']],
-  ['Echo', ['echoMix', 'echoTime', 'echoFb', 'tog:echoPP']], ['Space', ['revMix', 'revSize', 'revDamp', 'revPre']], ['Output', ['width', 'norm', 'tog:mono']]];
-const TOGL = { echoPP: 'Ping-pong', mono: 'Mono output' };
+  ['Echo', ['echoMix', 'echoTime', 'echoFb', 'tog:echoPP']], ['Space', ['revMix', 'revSize', 'revDamp', 'revPre']], ['Output', ['width', 'norm', 'tog:mono']],
+  ['Loop', ['tog:loop', 'loopStart', 'loopLen', 'loopXf']]];
+const TOGL = { echoPP: 'Ping-pong', mono: 'Mono output', loop: 'Seamless loop' };
 const UX = { vamt: p('Amount', 0, 1, 'lin', '%'), vn: p('Takes', 2, 9, 'lin', 'n', 1), rpm: p('Fire rate', 60, 1200, 'lin', 'rpm', 10), shots: p('Shots', 2, 16, 'lin', 'n', 1) };
 
 /* ---------- formatting & slider mapping ---------- */
@@ -79,7 +89,9 @@ function fmt(v, u) {
     case 'st': return sg(Math.round(v * 10) / 10) + ' st'; case 'oct': return sg(+v.toFixed(1)) + ' oct';
     case 'bits': return v < 1 ? 'Off' : v + '-bit'; case 'x': return v.toFixed(2) + '×'; case 'xi': return '×' + v;
     case 'n': return String(Math.round(v)); case 'n3': return v.toFixed(3); case 'ct': return Math.round(v) + ' ct';
-    case '/s': return (v < 10 ? +v.toFixed(1) : Math.round(v)) + '/s'; case 'v': return v + (v == 1 ? ' voice' : ' voices'); case ':1': return v.toFixed(1) + ':1';
+    case '/s': return (v < 10 ? +v.toFixed(1) : Math.round(v)) + '/s';
+    case 'syl': return v < 0.25 ? 'Off' : +v.toFixed(1) + ' syl/s';
+    case 'vow': { const V = 'AEIOU', i = Math.min(3, Math.floor(v)), f = v - i; return f < 0.03 ? V[i] : f > 0.97 ? V[i + 1] : V[i] + '→' + V[i + 1] + ' ' + Math.round(f * 100) + '%'; } case 'v': return v + (v == 1 ? ' voice' : ' voices'); case ':1': return v.toFixed(1) + ':1';
     case 'rpm': return Math.round(v) + ' rpm'; default: return (+v).toFixed(2);
   }
 }
@@ -106,7 +118,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 };
 function cleanSound(o) {
-  if (!o || !Array.isArray(o.layers)) throw new Error('Not an SFX Forge preset');
+  if (!o || !Array.isArray(o.layers)) throw new Error('Not an eefecks preset');
   const s = E.newSound(o);
   s.layers = o.layers.filter(l => l && E.TYPE_DEFAULTS[l.type]).map(l => E.newLayer(l.type, Object.assign({}, l, { id: undefined })));
   s.layers.forEach(l => { if (!l.id) l.id = E.newLayer(l.type).id; });
@@ -133,6 +145,7 @@ function summary(l) {
   else if (l.type === 'metal') parts.push(l.mode + ' ' + hz(l.f0));
   else if (l.type === 'pulse') parts.push(l.pShape + ' ' + fmt(l.f0, '/s') + (Math.abs(l.f0 - l.f1) < 0.05 ? '' : '→' + fmt(l.f1, '/s')));
   else if (l.type === 'bubble') parts.push(hz(l.f0) + ' · ' + fmt(l.density, '/s'));
+  else if (l.type === 'formant') { const V = 'AEIOU', a = V[Math.round(l.vow0)], b = V[Math.round(l.vow1)]; parts.push(hz(l.f0) + ' ' + (l.syll >= 0.25 ? 'speech ' + fmt(l.syll, 'syl') : a === b ? a : a + '→' + b)); }
   else parts.push(hz(l.f0));
   if (l.dir === 'rev') parts.push('reversed');
   if (l.fType !== 'off') parts.push(l.fType.toUpperCase() + ' ' + hz(l.cut) + (l.fMod > 0 ? ' ~' : ''));
@@ -316,7 +329,7 @@ function drawLanes() {
 function readout() {
   const r = S.res, db = x => x > 0 ? (20 * Math.log10(x)).toFixed(1) : '−∞';
   const on = S.sound.layers.filter(l => l.on).length;
-  $('#ro').innerHTML = `<span>Peak <b>${db(r.peak).replace('-', '−')} dBFS</b></span><span>Loudest 100 ms <b>${db(r.rms).replace('-', '−')} dB RMS</b></span><span>Length <b>${ms(r.duration * 1000)}</b></span><span>Layers <b>${on}/${S.sound.layers.length}</b></span><span>${r.mono ? 'Mono' : 'Stereo'}</span>`;
+  $('#ro').innerHTML = `<span>Peak <b>${db(r.peak).replace('-', '−')} dBFS</b></span><span>Loudest 100 ms <b>${db(r.rms).replace('-', '−')} dB RMS</b></span><span>Length <b>${ms(r.duration * 1000)}</b></span><span>Layers <b>${on}/${S.sound.layers.length}</b></span><span>${r.mono ? 'Mono' : 'Stereo'}</span>${r.loop ? '<span><b>Loop</b></span>' : ''}`;
 }
 
 /* ---------- audio ---------- */
@@ -327,19 +340,34 @@ function ac() {
   return AC;
 }
 function bufOf(res) { if (!res.buf) res.buf = E.toAudioBuffer(ac(), res); return res.buf; }
+const PLAYSVG = '<svg width="20" height="22" viewBox="0 0 20 22"><path d="M2 1.5v19L19 11z" fill="#111"/></svg>';
+const STOPSVG = '<svg width="18" height="18" viewBox="0 0 18 18"><rect x="2" y="2" width="14" height="14" rx="2" fill="#111"/></svg>';
+let looping = false;
+function setLooping(on) {
+  if (looping === on) return; looping = on;
+  const b = $('#play'); b.innerHTML = on ? STOPSVG : PLAYSVG; b.setAttribute('aria-label', on ? 'Stop loop' : 'Play sound');
+}
 function playRes(res, when, track) {
   const c = ac(), src = c.createBufferSource();
   src.buffer = bufOf(res); src.connect(out);
+  const lp = track === true && !!res.loop; if (lp) src.loop = true;
   const at = c.currentTime + (when || 0) + 0.005; src.start(at);
-  if (track) { if (cur) try { cur.stop(); } catch (e) {} cur = src; t0 = at; anim(res.duration); }
+  if (track) { if (cur) try { cur.stop(); } catch (e) {} cur = src; t0 = at; setLooping(lp); anim(res.duration, src); }
   return src;
 }
-function anim(dur) {
+function anim(dur, src) {
   cancelAnimationFrame(raf);
-  const step = () => { const ph = (AC.currentTime - t0) / dur; blit(ph); if (ph < 1) raf = requestAnimationFrame(step); else blit(-1); };
+  const step = () => {
+    if (cur !== src) return;
+    const ph = (AC.currentTime - t0) / dur;
+    if (src.loop) { blit(ph < 0 ? 0 : ph % 1); raf = requestAnimationFrame(step); return; }
+    blit(ph); if (ph < 1) raf = requestAnimationFrame(step); else blit(-1);
+  };
   raf = requestAnimationFrame(step);
 }
+function stopPlay() { if (cur) try { cur.stop(); } catch (e) {} cur = null; setLooping(false); cancelAnimationFrame(raf); blit(-1); }
 function play() { flush(); try { playRes(S.res, 0, true); } catch (e) { toast('Audio could not start in this view'); } }
+function togglePlay() { if (looping) stopPlay(); else play(); }
 
 /* ---------- variations ---------- */
 let vTok = 0;
@@ -363,7 +391,7 @@ function burst() {
   flush();
   const takes = Math.min(S.vn, 4); for (let i = 0; i < takes; i++) makeVar(i);
   const iv = 60 / S.rpm;
-  try { for (let k = 0; k < S.shots; k++) playRes(S.vars[k % takes].res, k * iv, k === 0); } catch (e) { toast('Audio could not start in this view'); }
+  try { for (let k = 0; k < S.shots; k++) playRes(S.vars[k % takes].res, k * iv, k === 0 ? 'once' : false); } catch (e) { toast('Audio could not start in this view'); }
 }
 
 /* ---------- mutate ---------- */
@@ -422,7 +450,7 @@ async function exportKit() {
   const json = JSON.stringify(all, null, 1);
   let engine;
   try { engine = await engineSource(); } catch (e) { toast('Could not read the engine file'); return; }
-  const readme = `SFX Forge game kit
+  const readme = `eefecks game kit
 
 sfx-engine.js   The synthesis engine. No dependencies; works in browsers, Web Workers and Node.
 sounds.json     Your presets (the current sound plus your saved library).
@@ -446,7 +474,9 @@ Render at load time, then play buffers (rendering takes about 1-150 ms per sound
       const takes = bank[key], src = ctx.createBufferSource(), g = ctx.createGain();
       src.buffer = takes[rr++ % takes.length]; g.gain.value = gain;
       src.connect(g).connect(ctx.destination); src.start();
+      return src;
     }
+    // presets made with "Seamless loop" render as a loop: set src.loop = true and stop() it when done
   <\/script>
 
 Node (e.g. to bake WAVs in a build step):
@@ -456,12 +486,13 @@ Node (e.g. to bake WAVs in a build step):
 
 vary(preset, n, amount) gives take number n: same design, nudged pitch, timing, filter and noise.
 `;
-  const demo = `<!DOCTYPE html><meta charset="utf-8"><title>SFX kit demo</title><style>body{font:15px system-ui;margin:24px}button{margin:4px;padding:8px 12px}</style>
-<h1>SFX kit demo</h1><div id="b"></div><script src="sfx-engine.js"><\/script><script src="sounds.js"><\/script>
+  const demo = `<!DOCTYPE html><meta charset="utf-8"><title>eefecks kit demo</title><style>body{font:15px system-ui;margin:24px}button{margin:4px;padding:8px 12px}</style>
+<h1>eefecks kit demo</h1><p>Loops play until you click them again.</p><div id="b"></div><script src="sfx-engine.js"><\/script><script src="sounds.js"><\/script>
 <script>let ctx,bank={},rr=0;for(const k in SFX_SOUNDS){const b=document.createElement('button');b.textContent=k;b.onclick=()=>{ctx=ctx||new AudioContext();
 bank[k]=bank[k]||[0,1,2,3].map(i=>SFXEngine.toAudioBuffer(ctx,SFXEngine.render(SFXEngine.vary(SFX_SOUNDS[k],i,0.5),{sr:ctx.sampleRate})));
-const s=ctx.createBufferSource();s.buffer=bank[k][rr++%4];s.connect(ctx.destination);s.start()};document.getElementById('b').appendChild(b)}<\/script>`;
-  offer('sfx_forge_game_kit.zip', E.zip([
+const lp=SFX_SOUNDS[k].master&&SFX_SOUNDS[k].master.loop;if(lp&&b.src){b.src.stop();b.src=null;return}
+const s=ctx.createBufferSource();s.buffer=bank[k][rr++%4];s.loop=!!lp;s.connect(ctx.destination);s.start();if(lp)b.src=s};document.getElementById('b').appendChild(b)}<\/script>`;
+  offer('eefecks_game_kit.zip', E.zip([
     { name: 'sfx-engine.js', data: engine + '\n' }, { name: 'sounds.json', data: json },
     { name: 'sounds.js', data: 'window.SFX_SOUNDS = ' + json + ';\n' }, { name: 'demo.html', data: demo }, { name: 'README.txt', data: readme }
   ]));
@@ -473,7 +504,7 @@ function closeModal() { $('#modal').classList.remove('on'); }
 let tT = 0;
 function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('on'); clearTimeout(tT); tT = setTimeout(() => t.classList.remove('on'), 2200); }
 let pT = 0;
-function persist() { clearTimeout(pT); pT = setTimeout(() => store.set('sfxforge.cur', S.sound), 400); }
+function persist() { clearTimeout(pT); pT = setTimeout(() => store.set('eefecks.cur', S.sound), 400); }
 
 /* ---------- events ---------- */
 let dragSnap = false;
@@ -544,16 +575,16 @@ document.addEventListener('click', e => {
     return;
   }
   if (t.dataset.li) { snap(); S.sound = cleanSound(JSON.parse(JSON.stringify(lib[+t.dataset.li]))); afterLoad(false); play(); return; }
-  if (t.dataset.ld) { const n = lib[+t.dataset.ld].name; lib.splice(+t.dataset.ld, 1); store.set('sfxforge.lib', lib); buildLib(); toast('Removed ' + n); return; }
+  if (t.dataset.ld) { const n = lib[+t.dataset.ld].name; lib.splice(+t.dataset.ld, 1); store.set('eefecks.lib', lib); buildLib(); toast('Removed ' + n); return; }
   switch (t.id) {
-    case 'play': return play();
+    case 'play': return togglePlay();
     case 'regen': return generate(S.sound.cat || 'rifle');
     case 'mutate': return mutate();
     case 'undo': return undo();
     case 'redo': return redo();
     case 'newtakes': S.vbase += 100; varsDirty(); return;
     case 'burst': return burst();
-    case 'save': { const c = JSON.parse(JSON.stringify(S.sound)); const at = lib.findIndex(x => x.name === c.name); if (at >= 0) lib[at] = c; else lib.unshift(c); store.set('sfxforge.lib', lib); buildLib(); toast('Saved “' + c.name + '”'); return; }
+    case 'save': { const c = JSON.parse(JSON.stringify(S.sound)); const at = lib.findIndex(x => x.name === c.name); if (at >= 0) lib[at] = c; else lib.unshift(c); store.set('eefecks.lib', lib); buildLib(); toast('Saved “' + c.name + '”'); return; }
     case 'xwav': return exportWav();
     case 'xpack': return exportPack();
     case 'xkit': return exportKit();
@@ -571,7 +602,7 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { if (typing) return; e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { if (typing) return; e.preventDefault(); redo(); return; }
   if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
-  if (e.code === 'Space' && tag !== 'BUTTON') { e.preventDefault(); play(); }
+  if (e.code === 'Space' && tag !== 'BUTTON') { e.preventDefault(); togglePlay(); }
   else if (e.key === 'g' || e.key === 'G') generate(S.sound.cat || 'rifle');
   else if (e.key === 'm' || e.key === 'M') mutate();
 });
@@ -579,9 +610,9 @@ const ro = new ResizeObserver(() => { if (S.res) { drawAll(); S.vars.forEach((v,
 
 /* ---------- boot ---------- */
 function start(data) {
-  lib = store.get('sfxforge.lib', []);
+  lib = store.get('eefecks.lib', null) || store.get('sfxforge.lib', []);
   let s = data && data.sound;
-  if (!s) s = store.get('sfxforge.cur', null);
+  if (!s) s = store.get('eefecks.cur', null) || store.get('sfxforge.cur', null);
   try { S.sound = s ? cleanSound(s) : null; } catch (e) { S.sound = null; }
   if (!S.sound) S.sound = G.generate('rifle', 20261121);
   buildGens(); buildLib(); buildUX();
