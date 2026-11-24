@@ -19,9 +19,18 @@ const PL = {
   uni: p('Unison', 1, 7, 'lin', 'v', 1), detune: p('Detune', 0, 100, 'lin', 'ct'), vibRate: p('Vibrato rate', 0.5, 30, 'log', 'Hz'), vibDepth: p('Vibrato', 0, 200, 'pow', 'ct'),
   density: p('Crackle rate', 10, 20000, 'log', '/s'),
   partials: p('Partials', 1, 16, 'lin', 'n', 1), ring: p('Ring', 5, 6000, 'pow', 'ms'), damp: p('HF damping', 0, 2, 'lin', 'n2'), tilt: p('Tilt', 0, 2, 'lin', 'n2'), spread: p('Inharmonic', 0, 0.1, 'lin', 'n3'),
-  bright: p('Brightness', 0, 1, 'lin', '%'), pick: p('Pick tone', 0, 1, 'lin', '%')
+  bright: p('Brightness', 0, 1, 'lin', '%'), pick: p('Pick tone', 0, 1, 'lin', '%'),
+  fMod: p('Motion', 0, 4, 'lin', 'oct', 0.05), fModRate: p('Motion rate', 0.05, 40, 'log', 'Hz'),
+  width: p('Pulse length', 0.05, 100, 'log', 'ms'), tone: p('Pulse tone', 20, 8000, 'log', 'Hz'), pJit: p('Irregular', 0, 1, 'lin', '%'), accent: p('Accent', 0, 1, 'lin', '%'),
+  scatter: p('Pitch spread', 0, 4, 'lin', 'oct', 0.05), rise: p('Rise', 0, 3, 'lin', 'oct', 0.05)
 };
-const LABEL = { metal: { f0: 'Pitch' }, string: { f0: 'Pitch' } };
+/* per-type overrides of a shared key's label and range */
+const PT = {
+  metal: { f0: { l: 'Pitch' } }, string: { f0: { l: 'Pitch' } },
+  pulse: { f0: p('Start rate', 0.5, 2000, 'log', '/s'), f1: p('End rate', 0.5, 2000, 'log', '/s'), sweep: { l: 'Rate sweep' }, sweepCurve: { l: 'Sweep shape' } },
+  bubble: { f0: p('Pitch', 60, 8000, 'log', 'Hz'), density: p('Bubbles', 0.5, 500, 'log', '/s'), ring: p('Bubble length', 2, 400, 'log', 'ms') }
+};
+const pdef = (t, k) => { const o = (PT[t] || {})[k]; return o ? Object.assign({}, PL[k], o) : PL[k]; };
 const PM = {
   pitch: p('Pitch', -24, 24, 'lin', 'st', 0.1), time: p('Time', 0.25, 4, 'log', 'x'), gain: p('Input', -24, 24, 'lin', 'dB', 0.1), drive: p('Saturate', 0, 1, 'lin', '%'),
   lowcut: p('Low cut', 20, 2000, 'log', 'Hz'), highcut: p('High cut', 1000, 20000, 'log', 'Hz'),
@@ -35,17 +44,23 @@ const OPTS = {
   color: [['white', 'White'], ['pink', 'Pink'], ['brown', 'Brown'], ['crackle', 'Crackle']],
   mode: [['bar', 'Bar'], ['bell', 'Bell'], ['plate', 'Plate'], ['glass', 'Glass'], ['tube', 'Tube'], ['random', 'Rand']],
   fType: [['off', 'Off'], ['lp', 'LP'], ['hp', 'HP'], ['bp', 'BP'], ['notch', 'Notch']],
-  tremShape: [['sine', 'Sine'], ['square', 'Gate'], ['saw', 'Saw'], ['random', 'Random']]
+  tremShape: [['sine', 'Sine'], ['square', 'Gate'], ['saw', 'Saw'], ['random', 'Random']],
+  fModShape: [['sine', 'Sine'], ['wander', 'Wander'], ['step', 'Step']],
+  vibShape: [['sine', 'Sine'], ['wander', 'Wander']],
+  pShape: [['click', 'Click'], ['noise', 'Noise'], ['tone', 'Tone']],
+  dir: [['fwd', 'Forward'], ['rev', 'Reversed']]
 };
 const SRC = {
   osc: ['seg:wave', 'f0', 'f1', 'sweep', 'sweepCurve', 'jumpT', 'jumpSemi', 'pw'],
   noise: ['seg:color', 'density'],
   metal: ['seg:mode', 'f0', 'partials', 'ring', 'damp', 'tilt', 'spread'],
-  string: ['f0', 'ring', 'bright', 'pick']
+  string: ['f0', 'ring', 'bright', 'pick'],
+  pulse: ['seg:pShape', 'f0', 'f1', 'sweep', 'sweepCurve', 'width', 'tone', 'pJit', 'accent'],
+  bubble: ['f0', 'scatter', 'density', 'rise', 'ring']
 };
-const TNAME = { osc: 'Tone', noise: 'Noise', metal: 'Metal', string: 'String' };
-const LSEC = t => [['Source', SRC[t]]].concat(t === 'osc' ? [['FM and unison', ['fmRatio', 'fmIndex', 'fmDecay', 'uni', 'detune', 'vibRate', 'vibDepth']]] : [],
-  [['Envelope', ['atk', 'hold', 'dec', 'curve']], ['Filter', ['seg:fType', 'cut', 'q', 'fEnv', 'fEnvT']], ['Tremolo', ['seg:tremShape', 'trem', 'tremRate']],
+const TNAME = { osc: 'Tone', noise: 'Noise', metal: 'Metal', string: 'String', pulse: 'Pulse', bubble: 'Bubble' };
+const LSEC = t => [['Source', SRC[t]]].concat(t === 'osc' ? [['FM and unison', ['fmRatio', 'fmIndex', 'fmDecay', 'uni', 'detune', 'seg:vibShape', 'vibRate', 'vibDepth']]] : [],
+  [['Envelope', ['seg:dir', 'atk', 'hold', 'dec', 'curve']], ['Filter', ['seg:fType', 'cut', 'q', 'fEnv', 'fEnvT', 'seg:fModShape', 'fMod', 'fModRate']], ['Tremolo', ['seg:tremShape', 'trem', 'tremRate']],
    ['Grit', ['drive', 'bits', 'ds']], ['Repeat', ['rep', 'repInt', 'repDecay', 'repPitch', 'repJit']], ['Mix', ['gain', 'pan', 'delay']]]);
 const MSEC = [['Character', ['pitch', 'time', 'gain', 'drive']], ['Tone', ['lowcut', 'highcut']], ['Dynamics', ['compThr', 'compRatio', 'compAtk', 'compRel']],
   ['Echo', ['echoMix', 'echoTime', 'echoFb', 'tog:echoPP']], ['Space', ['revMix', 'revSize', 'revDamp', 'revPre']], ['Output', ['width', 'norm', 'tog:mono']]];
@@ -64,7 +79,7 @@ function fmt(v, u) {
     case 'st': return sg(Math.round(v * 10) / 10) + ' st'; case 'oct': return sg(+v.toFixed(1)) + ' oct';
     case 'bits': return v < 1 ? 'Off' : v + '-bit'; case 'x': return v.toFixed(2) + '×'; case 'xi': return '×' + v;
     case 'n': return String(Math.round(v)); case 'n3': return v.toFixed(3); case 'ct': return Math.round(v) + ' ct';
-    case '/s': return Math.round(v) + '/s'; case 'v': return v + (v == 1 ? ' voice' : ' voices'); case ':1': return v.toFixed(1) + ':1';
+    case '/s': return (v < 10 ? +v.toFixed(1) : Math.round(v)) + '/s'; case 'v': return v + (v == 1 ? ' voice' : ' voices'); case ':1': return v.toFixed(1) + ':1';
     case 'rpm': return Math.round(v) + ' rpm'; default: return (+v).toFixed(2);
   }
 }
@@ -116,8 +131,11 @@ function summary(l) {
   if (l.type === 'osc') parts.push(l.wave + ' ' + (Math.abs(l.f0 - l.f1) < 0.5 ? hz(l.f0) : hz(l.f0) + '→' + hz(l.f1)));
   else if (l.type === 'noise') parts.push(l.color);
   else if (l.type === 'metal') parts.push(l.mode + ' ' + hz(l.f0));
+  else if (l.type === 'pulse') parts.push(l.pShape + ' ' + fmt(l.f0, '/s') + (Math.abs(l.f0 - l.f1) < 0.05 ? '' : '→' + fmt(l.f1, '/s')));
+  else if (l.type === 'bubble') parts.push(hz(l.f0) + ' · ' + fmt(l.density, '/s'));
   else parts.push(hz(l.f0));
-  if (l.fType !== 'off') parts.push(l.fType.toUpperCase() + ' ' + hz(l.cut));
+  if (l.dir === 'rev') parts.push('reversed');
+  if (l.fType !== 'off') parts.push(l.fType.toUpperCase() + ' ' + hz(l.cut) + (l.fMod > 0 ? ' ~' : ''));
   parts.push(ms(l.atk + l.hold + l.dec));
   if (l.rep > 1) parts.push('×' + l.rep);
   if (l.delay > 0.5) parts.push('@' + ms(l.delay));
@@ -133,7 +151,7 @@ function layerHTML(l) {
   const open = S.open.has(l.id);
   const body = LSEC(l.type).map(([h, keys]) => `<div class="sec"><h3>${h}</h3>${keys.map(k => {
     if (k.startsWith('seg:')) { const kk = k.slice(4); return seg('l', l.id, kk, OPTS[kk], l[kk]); }
-    return ctl('l', l.id, k, PL[k], l[k], (LABEL[l.type] || {})[k]);
+    return ctl('l', l.id, k, pdef(l.type, k), l[k]);
   }).join('')}</div>`).join('');
   return `<article class="layer${open ? ' open' : ''}${l.on ? '' : ' muted'}" data-id="${l.id}" style="--lc:var(--c-${l.type})">
     <div class="lh">
@@ -285,7 +303,7 @@ function drawLanes() {
     if (s) {
       const x0 = s.start / dur * W, x1 = Math.max(x0 + 3 * d, s.end / dur * W);
       const col = css.getPropertyValue('--c-' + l.type).trim() || '#ff4f00';
-      const gr = g.createLinearGradient(x0, 0, x1, 0); gr.addColorStop(0, col); gr.addColorStop(1, col + '22');
+      const gr = g.createLinearGradient(x0, 0, x1, 0), rv = l.dir === 'rev'; gr.addColorStop(rv ? 1 : 0, col); gr.addColorStop(rv ? 0 : 1, col + '22');
       g.fillStyle = gr; g.fillRect(x0, y, x1 - x0, h);
     }
     const label = l.name || TNAME[l.type], tx = s ? s.start / dur * W + 6 * d : 6 * d;
@@ -355,8 +373,8 @@ function mutate() {
   const r = E.rng((Math.random() * 2 ** 31) >>> 0), amt = 0.06 + S.vamt * 0.12;
   S.sound.layers.forEach(l => LSEC(l.type).forEach(([, keys]) => keys.forEach(k => {
     if (k.includes(':') || NOMUT.has(k) || r() > 0.45) return;
-    if (k === 'delay' && !l.delay) return;
-    const d = PL[k]; l[k] = fromX(d, clamp(toX(d, l[k]) + (r() * 2 - 1) * amt * 1000, 0, 1000));
+    if ((k === 'delay' || k === 'fMod') && !l[k]) return;
+    const d = pdef(l.type, k); l[k] = fromX(d, clamp(toX(d, l[k]) + (r() * 2 - 1) * amt * 1000, 0, 1000));
   })));
   S.sound.seed = (Math.random() * 2 ** 31) >>> 0;
   afterLoad(true); play();
@@ -463,7 +481,7 @@ function setVal(el) {
   const { s, i, k } = el.dataset;
   if (s === 'u') { const v = fromX(UX[k], +el.value); S[k] = v; el.nextElementSibling.textContent = fmt(v, UX[k].u); el.style.setProperty('--p', el.value / 10 + '%'); if (k === 'vamt' || k === 'vn') { S.vbase = S.vbase; varsDirty(); } return false; }
   if (!dragSnap) { snap(); dragSnap = true; }
-  const d = s === 'm' ? PM[k] : PL[k], v = fromX(d, +el.value);
+  const d = s === 'm' ? PM[k] : pdef(S.sound.layers.find(x => x.id === i).type, k), v = fromX(d, +el.value);
   if (s === 'm') S.sound.master[k] = v;
   else { const l = S.sound.layers.find(x => x.id === i); l[k] = v; const sm = el.closest('.layer').querySelector('.sum'); sm.textContent = summary(l); }
   el.nextElementSibling.textContent = fmt(v, d.u); el.style.setProperty('--p', el.value / 10 + '%');
@@ -489,7 +507,7 @@ document.addEventListener('dblclick', e => {
   let def;
   if (s === 'm') def = E.MASTER[k]; else { const l = S.sound.layers.find(x => x.id === i); def = (E.TYPE_DEFAULTS[l.type][k] ?? E.COMMON[k]); }
   if (def == null) return;
-  const d = s === 'm' ? PM[k] : PL[k]; el.value = toX(d, def); dragSnap = false; setVal(el); dragSnap = false;
+  const d = s === 'm' ? PM[k] : pdef(S.sound.layers.find(x => x.id === i).type, k); el.value = toX(d, def); dragSnap = false; setVal(el); dragSnap = false;
   if (s === 'm') S.sound.master[k] = def; else S.sound.layers.find(x => x.id === i)[k] = def;
   el.nextElementSibling.textContent = fmt(def, d.u); doRender(); if (S.auto) play();
 });
