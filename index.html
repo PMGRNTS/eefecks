@@ -3,9 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SFX Forge</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%2216%22 fill=%22%23ff4f00%22/%3E%3Cpath d=%22M12 9v14l11-7z%22 fill=%22%23111%22/%3E%3C/svg%3E">
-<meta name="description" content="Layered procedural sound effects generator for games: weapons, impacts, UI and abilities, with variations and WAV export.">
+<title>eefecks</title>
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="theme-color" content="#ff4f00">
+<meta name="description" content="eefecks: a layered procedural sound effects generator for games. Weapons, impacts, creatures, loops, UI and abilities, with variations and WAV export.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -14,8 +17,8 @@
 </head>
 <body>
 <header class="top">
-  <h1>SFX Forge</h1>
-  <p><kbd>Space</kbd> play · <kbd>G</kbd> new take · <kbd>M</kbd> mutate · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo</p>
+  <h1><img src="icons/icon.svg" alt="" width="28" height="28">eefecks</h1>
+  <p><kbd>Space</kbd> play/stop · <kbd>G</kbd> new take · <kbd>M</kbd> mutate · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo</p>
 </header>
 <div class="app">
   <aside class="gens panel">
@@ -60,6 +63,7 @@
         <button class="btn" data-t="string">+ String</button>
         <button class="btn" data-t="pulse">+ Pulse</button>
         <button class="btn" data-t="bubble">+ Bubble</button>
+        <button class="btn" data-t="formant">+ Voice</button>
       </div>
     </div>
     <div id="layers"></div>

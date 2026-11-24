@@ -1,4 +1,6 @@
-# SFX Forge
+<p align="center"><img src="icons/icon.svg" alt="" width="96" height="96"></p>
+
+# eefecks
 
 A browser-based sound effects generator for games. Instead of a single oscillator through a single envelope (the sfxr/jsfxr approach), every sound is a stack of layers (transient, body, mechanism, tail…) mixed through a master bus, the way real game audio is built.
 
@@ -13,12 +15,13 @@ Everything runs client-side in plain JavaScript: no build step, no dependencies,
 - **String**: Karplus-Strong plucked string
 - **Pulse**: a train of short clicks, noise bursts or tone blips whose rate sweeps over time, with irregularity and accent, for engines, motors, ratchets, creaks, crackling and text blips
 - **Bubble**: scattered sine chirps that rise in pitch as they decay, for water, splashes, drips, potions and slime
+- **Voice**: formant synthesis. A glottal source and breath noise go through three vowel formants that glide from one vowel (A E I O U) to another. Throat size makes it bigger or smaller, roughness adds growl and vocal fry, and a speech mode babbles random syllables with intonation, for creatures, grunts, robots and made-up dialogue
 
 Every layer has an attack/hold/decay envelope that can play reversed (swells, charge-ups, sucks into an impact), a resonant state-variable filter with its own envelope and motion (sine, smoothly wandering or stepped random sweeps of the cutoff, for wind, fire and wobble), tremolo, drive, bitcrush/downsample, repeats (bursts, rattles, arpeggios), pan and start time.
 
-**Master bus**: pitch, time stretch, saturation, low/high cut, compressor, echo (with ping-pong), reverb, stereo width, peak normalize and mono output.
+**Master bus**: pitch, time stretch, saturation, low/high cut, compressor, echo (with ping-pong), reverb, stereo width, peak normalize, mono output and **seamless loops**: pick a loop start and length, and whatever plays after the loop end is crossfaded into its start, so the WAV loops without a click (including reverb and echo tails). Loops repeat in the app until you stop them.
 
-**38 generators** in six groups: weapons (rifle, pistol, sniper, shotgun, laser, explosion, reload, minigun spin, railgun), feedback (hitmarker, headshot, kill confirm, impact, ricochet, shatter), movement (footstep, jump, dash), abilities (ability cast, pickup, coin, shutdown, low health, teleport, heal, poison), world (engine rev, door creak, splash, water drip, fire, wind, electric hum) and interface (click, confirm, deny, countdown, round start, text scroll).
+**52 generators** in eight groups: weapons (rifle, pistol, sniper, shotgun, laser, explosion, reload, minigun spin, railgun), feedback (hitmarker, headshot, kill confirm, impact, ricochet, shatter), movement (footstep, jump, dash), abilities (ability cast, pickup, coin, shutdown, low health, teleport, heal, poison), world (engine rev, door creak, splash, water drip), creatures (growl, roar, squeak, hurt grunt, zombie, alien chatter, robot voice, NPC chatter), loops (engine idle, fire, wind, rain, electric hum, shield drone, siren, cauldron) and interface (click, confirm, deny, countdown, round start, text scroll).
 
 **Built for competitive games**
 - **Variations**: subtly different takes of one design (pitch, timing, filter, noise) so repeated sounds never machine-gun identically; export them as a pack
@@ -32,7 +35,7 @@ Every layer has an attack/hold/decay envelope that can play reversed (swells, ch
 
 | Key | Action |
 | --- | --- |
-| Space | Play |
+| Space | Play (stops a playing loop) |
 | G | New take from the current generator |
 | M | Mutate |
 | Ctrl/Cmd + Z | Undo |
@@ -68,9 +71,12 @@ Double-click any slider to reset it to its default.
     g.gain.value = gain;
     src.connect(g).connect(ctx.destination);
     src.start();
+    return src;
   }
 </script>
 ```
+
+Presets saved with **Seamless loop** on render to a loop: play them with `src.loop = true` and call `src.stop()` when the loop should end. The engine keeps its `SFXEngine` global and the kit keeps `SFX_SOUNDS`, so code written against earlier versions keeps working.
 
 Rendering takes roughly 1–150 ms per sound, so do it at load time (or in a Worker), not in the hot path.
 
@@ -88,7 +94,7 @@ fs.writeFileSync('my-sound.wav', SFXEngine.encodeWav(res, { bits: 16, mono: true
 
 | Function | Returns |
 | --- | --- |
-| `render(preset, { sr })` | `{ L, R, sr, duration, peak, rms, mono, spans }` with Float32Array channels |
+| `render(preset, { sr })` | `{ L, R, sr, duration, peak, rms, mono, loop, spans }` with Float32Array channels |
 | `vary(preset, n, amount)` | Take number `n` of the preset, nudged by `amount` (0–1) |
 | `toAudioBuffer(audioContext, result)` | A Web Audio `AudioBuffer` |
 | `encodeWav(result, { bits, mono })` | `Uint8Array` WAV file (16, 24 or 32-bit float) |
@@ -103,7 +109,7 @@ Same preset + same seed always renders the same audio.
    ```bash
    git init
    git add .
-   git commit -m "SFX Forge"
+   git commit -m "eefecks"
    git branch -M main
    git remote add origin https://github.com/<your-username>/<repo-name>.git
    git push -u origin main
@@ -122,6 +128,7 @@ To run locally, serve the folder with any static server (e.g. `python3 -m http.s
 index.html          app markup
 css/style.css       styles (light and dark themes)
 js/sfx-engine.js    synthesis engine, WAV and ZIP encoders (standalone)
-js/generators.js    the 24 sound generators
+js/generators.js    the 52 sound generators
+icons/              app icon (SVG, plus PNGs for home screens)
 js/app.js           user interface
 ```
