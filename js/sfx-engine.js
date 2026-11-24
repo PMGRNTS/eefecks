@@ -20,16 +20,19 @@
   var COMMON = {
     on: true, solo: false, name: '', gain: 0, pan: 0, delay: 0,
     atk: 0.5, hold: 0, dec: 250, curve: 3,
-    fType: 'off', cut: 4000, q: 0.707, fEnv: 0, fEnvT: 80,
+    dir: 'fwd',
+    fType: 'off', cut: 4000, q: 0.707, fEnv: 0, fEnvT: 80, fMod: 0, fModRate: 2, fModShape: 'sine',
     trem: 0, tremRate: 12, tremShape: 'sine',
     drive: 0, bits: 0, ds: 1,
     rep: 1, repInt: 80, repDecay: 0.7, repPitch: 0, repJit: 0
   };
   var TYPE_DEFAULTS = {
-    osc: { wave: 'sine', f0: 440, f1: 440, sweep: 100, sweepCurve: 2, pw: 0.5, jumpT: 0, jumpSemi: 0, fmRatio: 2, fmIndex: 0, fmDecay: 200, uni: 1, detune: 12, vibRate: 6, vibDepth: 0 },
+    osc: { wave: 'sine', f0: 440, f1: 440, sweep: 100, sweepCurve: 2, pw: 0.5, jumpT: 0, jumpSemi: 0, fmRatio: 2, fmIndex: 0, fmDecay: 200, uni: 1, detune: 12, vibRate: 6, vibDepth: 0, vibShape: 'sine' },
     noise: { color: 'white', density: 2000 },
     metal: { mode: 'bar', f0: 800, partials: 6, ring: 500, damp: 1, tilt: 1, spread: 0.01, dec: 800, curve: 1.5 },
-    string: { f0: 220, ring: 800, bright: 0.5, pick: 0.7, dec: 1200, curve: 1.2 }
+    string: { f0: 220, ring: 800, bright: 0.5, pick: 0.7, dec: 1200, curve: 1.2 },
+    pulse: { f0: 30, f1: 30, sweep: 300, sweepCurve: 2, pShape: 'noise', width: 4, tone: 180, pJit: 0, accent: 0, dec: 600, curve: 1.5 },
+    bubble: { f0: 600, scatter: 1, density: 12, rise: 0.8, ring: 40, dec: 600, curve: 1.5 }
   };
   var MASTER = {
     pitch: 0, time: 1, gain: 0, drive: 0, lowcut: 20, highcut: 20000,
@@ -73,6 +76,19 @@
     return 0;
   }
 
+  /* modulation source: sine, smooth random 'wander', or stepped random 'step'. Returns t -> -1..1 */
+  function lfo(shape, rate, rr) {
+    if (shape !== 'wander' && shape !== 'step') return function (t) { return Math.sin(TAU * rate * t); };
+    var k = -1, a = 0, b = rr() * 2 - 1;
+    return function (t) {
+      var ph = t * rate, kk = Math.floor(ph);
+      while (k < kk) { k++; a = b; b = rr() * 2 - 1; }
+      if (shape === 'step') return a;
+      var f = ph - kk; f = f * f * (3 - 2 * f);
+      return a + (b - a) * f;
+    };
+  }
+
   /* ---------- sources ---------- */
   function srcOsc(l, out, sr, pm, tm, r) {
     var N = out.length, f0 = l.f0 * pm, f1 = l.f1 * pm;
@@ -83,11 +99,12 @@
     var norm = 1 / Math.sqrt(U), mp = 0, fmD = Math.max(0.005, l.fmDecay * tm / 1000);
     var wave = l.wave, pw = clamp(l.pw, 0.02, 0.98), vr = l.vibRate, vd = l.vibDepth / 1200, fmI = l.fmIndex, fmR = l.fmRatio;
     var dc = 2 * pw - 1, nyq = sr * 0.45;
+    var vib = vd > 0 ? lfo(l.vibShape, vr, l.vibShape === 'wander' || l.vibShape === 'step' ? rng((r() * 4294967296) >>> 0) : null) : null;
     for (var i = 0; i < N; i++) {
       var t = i / sr, p = t < sw ? t / sw : 1;
       var f = f0 * Math.exp(lr * (1 - Math.pow(1 - p, sc)));
       if (jT >= 0 && t >= jT) f *= jM;
-      if (vd > 0) f *= Math.pow(2, vd * Math.sin(TAU * vr * t));
+      if (vib) f *= Math.pow(2, vd * vib(t));
       if (f > nyq) f = nyq;
       var pmod = 0;
       if (fmI > 0) {
@@ -170,7 +187,46 @@
       out[i] = y;
     }
   }
-  var SOURCES = { osc: srcOsc, noise: srcNoise, metal: srcMetal, string: srcString };
+  /* Pulse: a train of short events whose rate sweeps f0 -> f1. Engines, ratchets, motors, Geiger counters, creaks. */
+  function srcPulse(l, out, sr, pm, tm, r) {
+    var N = out.length, f0 = Math.max(0.1, l.f0 * pm), f1 = Math.max(0.1, l.f1 * pm), lr = Math.log(f1 / f0);
+    var sw = Math.max(0.0005, l.sweep * tm / 1000), sc = l.sweepCurve, jit = clamp(l.pJit, 0, 1), acc = clamp(l.accent, 0, 1);
+    var tau = Math.max(0.05, l.width) / 1000, shape = l.pShape, w = TAU * clamp(l.tone * pm, 10, sr * 0.45) / sr;
+    var E = Math.min(N, Math.ceil(tau * (shape === 'click' ? 8 : 6) * sr) + 2), ev = new Float32Array(E), k;
+    var dk = Math.exp(-1 / (tau * sr));
+    if (shape === 'click') { for (k = 0; k < E; k++) { var x = k / (tau * sr); ev[k] = Math.exp(-x) * (1 - x); } }
+    else if (shape === 'tone') { var a = 1; for (k = 0; k < E; k++) { ev[k] = Math.sin(w * k) * a; a *= dk; } }
+    var i = 0;
+    while (i < N) {
+      var t = i / sr, p = t < sw ? t / sw : 1, f = f0 * Math.exp(lr * (1 - Math.pow(1 - p, sc)));
+      var g = (1 - acc * r()) / Math.sqrt(1 + f * tau * 2), m = Math.min(E, N - i);
+      if (shape === 'noise') { var b = g; for (k = 0; k < m; k++) { out[i + k] += (r() * 2 - 1) * b; b *= dk; } }
+      else for (k = 0; k < m; k++) out[i + k] += ev[k] * g;
+      var per = (1 - jit) + jit * -Math.log(1 - r() * 0.999);
+      i += Math.max(1, Math.round(per * sr / f));
+    }
+  }
+
+  /* Bubble: scattered sine chirps that rise as they decay (Minnaert resonance). Water, potions, lava, slime. */
+  function srcBubble(l, out, sr, pm, tm, r) {
+    var N = out.length, f0 = l.f0 * pm, sc = clamp(l.scatter, 0, 4), rate = Math.max(0.05, l.density / tm);
+    var ring = Math.max(1, l.ring) * tm / 1000, rise = l.rise, norm = 1 / Math.sqrt(1 + rate * ring), t = 0;
+    while (t * sr < N) {
+      var fi = clamp(f0 * Math.pow(2, (r() * 2 - 1) * sc * 0.5), 20, sr * 0.4), q = Math.sqrt(f0 / fi);
+      var tau = ring * clamp(q, 0.3, 3), a = (0.35 + 0.65 * r()) * Math.min(2, q) * norm;
+      var i0 = Math.round(t * sr), len = Math.min(N - i0, Math.ceil(tau * 5 * sr)), ph = 0, at = Math.max(1, 0.0004 * sr);
+      var dk = Math.exp(-1 / (tau * sr)), env = a, kr = rise / (tau * 3 * sr);
+      for (var k = 0; k < len; k++) {
+        var f = fi * Math.pow(2, Math.min(rise * 2, k * kr));
+        if (f > sr * 0.45) break;
+        ph += TAU * f / sr;
+        out[i0 + k] += Math.sin(ph) * env * (k < at ? k / at : 1);
+        env *= dk;
+      }
+      t += -Math.log(1 - r() * 0.999) / rate;
+    }
+  }
+  var SOURCES = { osc: srcOsc, noise: srcNoise, metal: srcMetal, string: srcString, pulse: srcPulse, bubble: srcBubble };
 
   /* ---------- one hit of a layer ---------- */
   function hit(l, sr, pm, tm, seed) {
@@ -181,13 +237,14 @@
     SOURCES[l.type](l, out, sr, pm, tm, r);
     var svf = l.fType && l.fType !== 'off' ? new SVF() : null, mode = l.fType;
     var cut0 = l.cut * pm, fT = Math.max(1, l.fEnvT) * tm / 1000, fA = l.fEnv, Q = l.q;
+    var fM = svf && l.fMod ? l.fMod : 0, fLfo = fM ? lfo(l.fModShape, Math.max(0.01, l.fModRate) / tm, rng((seed ^ 0x5BD1E995) >>> 0)) : null;
     var drv = l.drive > 0 ? 1 + l.drive * 16 : 0, drvN = drv ? 1 / Math.tanh(drv) : 1;
     var qz = l.bits > 0 ? Math.pow(2, clamp(l.bits, 1, 16) - 1) : 0, ds = Math.max(1, l.ds | 0), hs = 0;
     var tr = l.trem, trR = l.tremRate, trS = 1, trLast = -1, shape = l.tremShape, curve = l.curve;
     for (var i = 0; i < N; i++) {
       var t = i / sr, x = out[i];
       if (svf) {
-        if ((i & 3) === 0) svf.set(cut0 * (fA ? Math.pow(2, fA * Math.exp(-t / fT)) : 1), Q, sr);
+        if ((i & 3) === 0) svf.set(cut0 * (fA ? Math.pow(2, fA * Math.exp(-t / fT)) : 1) * (fM ? Math.pow(2, fM * fLfo(t)) : 1), Q, sr);
         x = svf.run(x, mode);
       }
       var e;
@@ -208,6 +265,7 @@
       if (ds > 1) { if (i % ds === 0) hs = x; x = hs; }
       out[i] = x;
     }
+    if (l.dir === 'rev') out.reverse();
     return out;
   }
 
@@ -392,7 +450,7 @@
     return b;
   }
 
-  var api = { render: render, vary: vary, newLayer: newLayer, newSound: newSound, rng: rng, encodeWav: encodeWav, zip: zip, toAudioBuffer: toAudioBuffer, COMMON: COMMON, TYPE_DEFAULTS: TYPE_DEFAULTS, MASTER: MASTER, version: '1.0' };
+  var api = { render: render, vary: vary, newLayer: newLayer, newSound: newSound, rng: rng, encodeWav: encodeWav, zip: zip, toAudioBuffer: toAudioBuffer, COMMON: COMMON, TYPE_DEFAULTS: TYPE_DEFAULTS, MASTER: MASTER, version: '1.1' };
   root.SFXEngine = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof self !== 'undefined' ? self : this);

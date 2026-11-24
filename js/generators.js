@@ -6,6 +6,8 @@
   function Nz(o) { return E.newLayer('noise', o); }
   function Mt(o) { return E.newLayer('metal', o); }
   function St(o) { return E.newLayer('string', o); }
+  function Pu(o) { return E.newLayer('pulse', o); }
+  function Bb(o) { return E.newLayer('bubble', o); }
   function midi(m) { return 440 * Math.pow(2, (m - 69) / 12); }
   function H(r) {
     return {
@@ -111,6 +113,33 @@
           Mt({ name: 'Bolt home', mode: 'plate', f0: h.lg(2200, 3200), partials: 6, ring: 45, damp: 1.2, dec: 70, delay: tR, gain: 1 })
         ],
         master: { lowcut: 80, compThr: -12, compRatio: 3, revMix: 0.06, revSize: 0.25, revDamp: 0.6 }
+      };
+    } },
+
+    { id: 'minigun', label: 'Minigun spin', group: 'Weapons', fn: function (h) {
+      var T = h.n(700, 1100);
+      return {
+        layers: [
+          Pu({ name: 'Barrel clicks', pShape: 'click', f0: h.n(5, 8), f1: h.n(40, 60), sweep: T, sweepCurve: 2.2, width: 0.6, accent: 0.2, atk: 20, hold: T, dec: 400, curve: 2, fType: 'bp', cut: h.lg(1800, 3000), q: 2.5, gain: 0 }),
+          O({ name: 'Motor whine', wave: 'saw', f0: h.lg(60, 90), f1: h.lg(300, 450), sweep: T, sweepCurve: 2, uni: 2, detune: 10, atk: 150, hold: T - 100, dec: 500, curve: 2, fType: 'bp', cut: 1400, q: 2, fEnv: -2, fEnvT: T * 0.4, gain: -9 }),
+          Pu({ name: 'Bearings', pShape: 'noise', f0: 30, f1: 250, sweep: T, width: 1.5, pJit: 0.3, atk: 100, hold: T, dec: 400, fType: 'hp', cut: 3000, gain: -16 }),
+          Nz({ name: 'Air', color: 'pink', atk: T, dec: 400, fType: 'bp', cut: 900, q: 1, fEnv: -1.5, fEnvT: T * 0.5, gain: -16 })
+        ],
+        master: { lowcut: 50, compThr: -14, compRatio: 3, revMix: 0.08, revSize: 0.4 }
+      };
+    } },
+    { id: 'railgun', label: 'Railgun', group: 'Weapons', fn: function (h) {
+      var T = h.n(500, 800);
+      return {
+        layers: [
+          Nz({ name: 'Charge suck', color: 'white', dir: 'rev', atk: 0.5, dec: T, curve: 3, fType: 'bp', cut: h.lg(2000, 4000), q: 3, fEnv: 1.5, fEnvT: 200, gain: -6 }),
+          O({ name: 'Charge tone', wave: 'saw', f0: h.lg(150, 250), f1: h.lg(1500, 2500), sweep: T, sweepCurve: 0.6, uni: 3, detune: 15, atk: T * 0.9, dec: 30, fType: 'lp', cut: 4000, q: 4, trem: 0.4, tremRate: h.n(18, 30), gain: -9 }),
+          Nz({ name: 'Discharge', color: 'white', dec: h.n(150, 250), curve: 4, fType: 'hp', cut: 1500, drive: 0.5, delay: T, gain: 0 }),
+          O({ name: 'Beam', wave: 'square', f0: h.lg(2500, 4000), f1: h.lg(150, 300), sweep: h.n(200, 350), fmRatio: 1.5, fmIndex: 6, fmDecay: 150, dec: h.n(300, 450), fType: 'lp', cut: 6000, delay: T, gain: -3 }),
+          O({ name: 'Kick', f0: 180, f1: 45, sweep: 80, dec: 250, drive: 0.3, delay: T, gain: -1 }),
+          Mt({ name: 'Rail ring', mode: 'tube', f0: h.lg(900, 1400), partials: 8, ring: 600, dec: 700, delay: T, gain: -14 })
+        ],
+        master: { lowcut: 40, compThr: -14, compRatio: 4, revMix: 0.14, revSize: 0.6, echoMix: 0.1, echoTime: h.n(120, 200), echoFb: 0.25, width: 1.2 }
       };
     } },
 
@@ -278,6 +307,123 @@
       };
     } },
 
+    { id: 'teleport', label: 'Teleport', group: 'Abilities', fn: function (h) {
+      var T = h.n(350, 600);
+      return {
+        layers: [
+          Mt({ name: 'Reverse shimmer', mode: 'glass', f0: h.lg(1500, 2600), partials: 8, ring: 900, spread: 0.03, dir: 'rev', dec: T, curve: 1.5, gain: -4 }),
+          Nz({ name: 'Reverse air', color: 'pink', dir: 'rev', dec: T, curve: 2.5, fType: 'bp', cut: h.lg(1500, 3000), q: 1.5, gain: -8 }),
+          O({ name: 'Zip', f0: h.lg(300, 500), f1: h.lg(2500, 4000), sweep: T, sweepCurve: 0.5, atk: T, dec: 20, fmRatio: 2, fmIndex: 1, gain: -12 }),
+          O({ name: 'Pop', f0: h.lg(1200, 2000), f1: h.lg(150, 250), sweep: 120, dec: 180, delay: T, gain: 0 }),
+          Nz({ name: 'Displace', color: 'white', dec: 250, fType: 'bp', cut: 3000, fEnv: -2, fEnvT: 120, delay: T, gain: -6 }),
+          Mt({ name: 'Ring out', mode: 'bell', f0: h.lg(700, 1100), partials: 6, ring: 500, dec: 600, delay: T, gain: -14 })
+        ],
+        master: { lowcut: 60, revMix: 0.25, revSize: 0.65, echoMix: 0.1, echoTime: 140, echoFb: 0.25, width: 1.3 }
+      };
+    } },
+    { id: 'heal', label: 'Heal', group: 'Abilities', fn: function (h) {
+      var f = midi(h.i(67, 74));
+      return {
+        layers: [
+          Bb({ name: 'Bubbles', f0: h.lg(700, 1200), scatter: 1.2, density: h.n(25, 40), rise: 1, ring: 30, atk: 40, hold: 300, dec: 600, curve: 2, gain: -6 }),
+          O({ name: 'Chime', wave: 'sine', f0: f, f1: 1, rep: 3, repInt: h.n(80, 120), repPitch: h.pick([4, 5, 7]), repDecay: 0.85, atk: 3, hold: 20, dec: 500, curve: 2.5, fmRatio: 3, fmIndex: 1, fmDecay: 200, gain: 0 }),
+          O({ name: 'Warm pad', wave: 'triangle', f0: f / 2, f1: 1, uni: 3, detune: 12, atk: 150, hold: 200, dec: 700, curve: 2, gain: -12 }),
+          Nz({ name: 'Sparkle', color: 'white', atk: 60, dec: 600, fType: 'hp', cut: 7000, trem: 0.7, tremRate: 25, tremShape: 'random', gain: -20 })
+        ],
+        master: { lowcut: 120, revMix: 0.28, revSize: 0.6, echoMix: 0.08, echoTime: 120, echoFb: 0.2 }
+      };
+    } },
+    { id: 'poison', label: 'Poison', group: 'Abilities', fn: function (h) {
+      return {
+        layers: [
+          Bb({ name: 'Bubbles', f0: h.lg(180, 320), scatter: 1.5, density: h.n(15, 30), rise: h.n(0.6, 1.2), ring: 60, atk: 20, hold: 400, dec: 700, fType: 'lp', cut: 2500, gain: 0 }),
+          Bb({ name: 'Fizz', f0: h.lg(1500, 2500), scatter: 2, density: 120, rise: 0.5, ring: 8, atk: 50, hold: 300, dec: 600, gain: -12 }),
+          Nz({ name: 'Hiss', color: 'pink', atk: 30, hold: 300, dec: 700, fType: 'bp', cut: h.lg(1200, 2200), q: 2, fMod: 1, fModRate: 3, fModShape: 'wander', gain: -14 }),
+          O({ name: 'Sick tone', wave: 'saw', f0: h.lg(90, 130), f1: h.lg(70, 100), sweep: 1000, uni: 3, detune: 35, vibShape: 'wander', vibDepth: 60, vibRate: 4, atk: 60, hold: 300, dec: 600, fType: 'lp', cut: 600, q: 3, gain: -10 })
+        ],
+        master: { lowcut: 40, revMix: 0.15, revSize: 0.5 }
+      };
+    } },
+
+    /* ---------------- world: machines, water, weather ---------------- */
+    { id: 'engine', label: 'Engine rev', group: 'World', fn: function (h) {
+      var idle = h.n(14, 22), top = idle * h.n(3, 4.5), T = h.n(500, 900), H2 = h.n(300, 600);
+      return {
+        layers: [
+          Pu({ name: 'Cylinders', pShape: 'noise', f0: idle, f1: top, sweep: T, sweepCurve: 1.5, width: h.n(5, 9), accent: 0.35, pJit: 0.05, atk: 40, hold: T + H2, dec: 500, curve: 1.5, fType: 'lp', cut: h.lg(500, 900), q: 1.5, fEnv: -1, fEnvT: T, drive: 0.5, gain: 0 }),
+          Pu({ name: 'Exhaust tone', pShape: 'tone', tone: h.lg(70, 110), f0: idle, f1: top, sweep: T, sweepCurve: 1.5, width: 12, atk: 40, hold: T + H2, dec: 500, curve: 1.5, drive: 0.4, gain: -4 }),
+          Pu({ name: 'Valves', pShape: 'click', f0: idle * 2, f1: top * 2, sweep: T, sweepCurve: 1.5, width: 0.3, accent: 0.5, atk: 40, hold: T + H2, dec: 400, fType: 'bp', cut: h.lg(2000, 3500), q: 2, gain: -16 }),
+          Nz({ name: 'Intake', color: 'pink', atk: T * 0.7, hold: H2, dec: 400, fType: 'bp', cut: 900, q: 1.2, fEnv: -1.5, fEnvT: T * 0.6, gain: -16 })
+        ],
+        master: { lowcut: 30, drive: 0.25, compThr: -14, compRatio: 3, revMix: 0.06, revSize: 0.35 }
+      };
+    } },
+    { id: 'creak', label: 'Door creak', group: 'World', fn: function (h) {
+      var T = h.n(700, 1300), r0 = h.n(25, 45), r1 = h.n(60, 110), sc = h.n(0.6, 1.5);
+      return {
+        layers: [
+          Pu({ name: 'Stick-slip', pShape: 'tone', tone: h.lg(500, 900), width: h.n(2, 4), f0: r0, f1: r1, sweep: T, sweepCurve: sc, pJit: h.n(0.15, 0.35), accent: 0.4, atk: 80, hold: T * 0.6, dec: T * 0.4, curve: 1.5, fType: 'bp', cut: h.lg(700, 1400), q: h.n(4, 8), fMod: h.n(0.4, 0.8), fModRate: h.n(2, 5), fModShape: 'wander', gain: 0 }),
+          Pu({ name: 'Wood groan', pShape: 'click', width: 1, f0: r0, f1: r1, sweep: T, sweepCurve: sc, pJit: 0.2, atk: 80, hold: T * 0.6, dec: T * 0.4, curve: 1.5, fType: 'bp', cut: h.lg(250, 400), q: 6, gain: -6 }),
+          St({ name: 'Door body', f0: h.lg(90, 150), ring: 200, bright: 0.2, atk: 5, dec: 250, gain: -14 })
+        ],
+        master: { lowcut: 60, compThr: -14, compRatio: 3, revMix: 0.15, revSize: 0.45 }
+      };
+    } },
+    { id: 'splash', label: 'Splash', group: 'World', fn: function (h) {
+      return {
+        layers: [
+          Nz({ name: 'Slap', color: 'white', dec: h.n(30, 60), curve: 3, fType: 'bp', cut: h.lg(1500, 3000), q: 0.8, gain: 0 }),
+          Bb({ name: 'Bubbles', f0: h.lg(500, 900), scatter: h.n(1.5, 2.5), density: h.n(60, 120), rise: 1, ring: 25, atk: 5, hold: 80, dec: h.n(400, 700), curve: 2.5, delay: 10, gain: -2 }),
+          Bb({ name: 'Droplets', f0: h.lg(1500, 2500), scatter: 1.5, density: h.n(20, 40), rise: 1.5, ring: 12, atk: 30, dec: 600, curve: 2, delay: 80, gain: -10 }),
+          Nz({ name: 'Spray', color: 'pink', atk: 5, dec: h.n(250, 400), curve: 3, fType: 'hp', cut: 2500, delay: 5, gain: -10 }),
+          O({ name: 'Plunge', f0: 160, f1: 70, sweep: 60, dec: 90, gain: -6 })
+        ],
+        master: { lowcut: 50, revMix: 0.12, revSize: 0.45 }
+      };
+    } },
+    { id: 'drip', label: 'Water drip', group: 'World', fn: function (h) {
+      return {
+        layers: [
+          Bb({ name: 'Drip', f0: h.lg(700, 1400), scatter: 0, density: 0.1, rise: h.n(1, 1.8), ring: h.n(15, 30), dec: 300, gain: 0 }),
+          Nz({ name: 'Tick', color: 'white', dec: 3, fType: 'hp', cut: 4000, gain: -16 })
+        ],
+        master: { lowcut: 150, revMix: h.n(0.2, 0.35), revSize: h.n(0.5, 0.75), echoMix: 0.08, echoTime: h.n(150, 300), echoFb: 0.3 }
+      };
+    } },
+    { id: 'fire', label: 'Fire', group: 'World', fn: function (h) {
+      return {
+        layers: [
+          Nz({ name: 'Roar', color: 'brown', atk: 200, hold: 1200, dec: 600, curve: 2, fType: 'lp', cut: h.lg(300, 500), q: 1, fMod: 1, fModRate: h.n(1.5, 3), fModShape: 'wander', drive: 0.2, gain: 0 }),
+          Pu({ name: 'Crackles', pShape: 'noise', width: h.n(0.4, 1), f0: h.n(10, 20), f1: 1, pJit: 1, accent: 0.8, atk: 50, hold: 1300, dec: 400, fType: 'hp', cut: h.lg(1500, 3000), gain: -4 }),
+          Pu({ name: 'Pops', pShape: 'click', width: h.n(2, 4), f0: h.n(1.5, 3), f1: 1, pJit: 1, accent: 0.6, atk: 50, hold: 1300, dec: 400, fType: 'bp', cut: h.lg(500, 900), q: 1.5, gain: -2 }),
+          Nz({ name: 'Hiss', color: 'pink', atk: 200, hold: 1200, dec: 600, fType: 'bp', cut: 4000, q: 0.7, fMod: 0.6, fModRate: 2, fModShape: 'wander', gain: -18 })
+        ],
+        master: { lowcut: 40, revMix: 0.1, revSize: 0.4, width: 1.3 }
+      };
+    } },
+    { id: 'wind', label: 'Wind', group: 'World', fn: function (h) {
+      var L = h.n(2000, 3000);
+      return {
+        layers: [
+          Nz({ name: 'Gusts', color: 'pink', atk: 500, hold: L - 1200, dec: 700, curve: 1.5, fType: 'bp', cut: h.lg(400, 800), q: h.n(1.5, 3), fMod: h.n(1, 1.6), fModRate: h.n(0.4, 0.9), fModShape: 'wander', gain: 0 }),
+          Nz({ name: 'Whistle', color: 'white', atk: 700, hold: L - 1400, dec: 700, curve: 1.5, fType: 'bp', cut: h.lg(1200, 2200), q: h.n(8, 14), fMod: 0.8, fModRate: h.n(0.5, 1), fModShape: 'wander', gain: -10 }),
+          Nz({ name: 'Rumble', color: 'brown', atk: 400, hold: L - 1000, dec: 600, curve: 1.5, fType: 'lp', cut: 200, fMod: 0.5, fModRate: 0.5, fModShape: 'wander', gain: -6 })
+        ],
+        master: { lowcut: 30, revMix: 0.1, revSize: 0.6, width: 1.5 }
+      };
+    } },
+    { id: 'buzz', label: 'Electric hum', group: 'World', fn: function (h) {
+      var m = h.pick([100, 120]), L = h.n(500, 900);
+      return {
+        layers: [
+          Pu({ name: 'Hum', pShape: 'click', width: 0.4, f0: m, f1: 1, atk: 20, hold: L, dec: 300, fType: 'bp', cut: h.lg(800, 2000), q: 1.5, fMod: 0.5, fModRate: 6, fModShape: 'wander', drive: 0.5, gain: 0 }),
+          O({ name: 'Mains', wave: 'saw', f0: m / 2, f1: 1, atk: 20, hold: L, dec: 300, fType: 'lp', cut: 800, gain: -8 }),
+          Pu({ name: 'Arcs', pShape: 'noise', width: 0.5, f0: h.n(8, 20), f1: 1, pJit: 1, accent: 0.9, atk: 20, hold: L, dec: 300, fType: 'hp', cut: 3000, gain: -6 })
+        ],
+        master: { lowcut: 40, compThr: -12, compRatio: 3, revMix: 0.08, revSize: 0.35 }
+      };
+    } },
+
     /* ---------------- interface ---------------- */
     { id: 'click', label: 'UI click', group: 'Interface', fn: function (h) {
       var f = h.lg(1200, 3000);
@@ -327,6 +473,14 @@
           Nz({ name: 'Hit', color: 'pink', dec: 300, fType: 'lp', cut: 2500, fEnv: 1.5, fEnvT: 80, gain: -6 })
         ],
         master: { lowcut: 35, revMix: 0.28, revSize: 0.75, compThr: -14, compRatio: 3, width: 1.3 }
+      };
+    } },
+    { id: 'textscroll', label: 'Text scroll', group: 'Interface', fn: function (h) {
+      return {
+        layers: [
+          Pu({ name: 'Letters', pShape: 'tone', tone: h.lg(600, 1200), width: h.n(6, 12), f0: h.n(14, 22), f1: 1, pJit: 0.25, accent: 0.4, atk: 1, hold: h.n(500, 800), dec: 50, fType: 'lp', cut: 4000, bits: h.pick([0, 0, 6]), gain: 0 })
+        ],
+        master: { lowcut: 150, revMix: 0.05, revSize: 0.3 }
       };
     } }
   ];

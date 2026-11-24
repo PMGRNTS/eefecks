@@ -4,7 +4,7 @@
    COLOUR aluminium #e9eaec / night #141517, black screen, signal orange #ff4f00
    TYPE   Geist 600 for titles, Geist for UI, Geist Mono for readouts
    LAYOUT laptop: generators | screen + layers | master, variations, export. 720px: two columns. phone: stacked, screen sticky */
-:root{color-scheme:light dark;--bg:light-dark(#e9eaec,#141517);--panel:light-dark(#f7f7f8,#1c1d20);--ink:light-dark(#111214,#e9eaec);--mute:light-dark(#585c63,#9ca0a8);--line:light-dark(#cdd0d4,#2e3035);--soft:light-dark(#e1e3e6,#26282c);--acc:#ff4f00;--scr:#0c0d0f;--c-osc:#ff4f00;--c-noise:#cfc8b8;--c-metal:#7cb7ff;--c-string:#f5c542}
+:root{color-scheme:light dark;--bg:light-dark(#e9eaec,#141517);--panel:light-dark(#f7f7f8,#1c1d20);--ink:light-dark(#111214,#e9eaec);--mute:light-dark(#585c63,#9ca0a8);--line:light-dark(#cdd0d4,#2e3035);--soft:light-dark(#e1e3e6,#26282c);--acc:#ff4f00;--scr:#0c0d0f;--c-osc:#ff4f00;--c-noise:#cfc8b8;--c-metal:#7cb7ff;--c-string:#f5c542;--c-pulse:#b48cff;--c-bubble:#3fd0b0}
 :root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
 *{box-sizing:border-box;min-width:0}
 html,body{margin:0}

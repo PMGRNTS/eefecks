@@ -11,12 +11,14 @@ Everything runs client-side in plain JavaScript: no build step, no dependencies,
 - **Noise**: white, pink, brown and crackle (sparse impulse bursts)
 - **Metal**: modal synthesis with bar, bell, plate, glass, tube and random partial sets for pings, casings, shards and bells
 - **String**: Karplus-Strong plucked string
+- **Pulse**: a train of short clicks, noise bursts or tone blips whose rate sweeps over time, with irregularity and accent, for engines, motors, ratchets, creaks, crackling and text blips
+- **Bubble**: scattered sine chirps that rise in pitch as they decay, for water, splashes, drips, potions and slime
 
-Every layer has an attack/hold/decay envelope, a resonant state-variable filter with its own envelope, tremolo, drive, bitcrush/downsample, repeats (bursts, rattles, arpeggios), pan and start time.
+Every layer has an attack/hold/decay envelope that can play reversed (swells, charge-ups, sucks into an impact), a resonant state-variable filter with its own envelope and motion (sine, smoothly wandering or stepped random sweeps of the cutoff, for wind, fire and wobble), tremolo, drive, bitcrush/downsample, repeats (bursts, rattles, arpeggios), pan and start time.
 
 **Master bus**: pitch, time stretch, saturation, low/high cut, compressor, echo (with ping-pong), reverb, stereo width, peak normalize and mono output.
 
-**24 generators** in five groups: weapons (rifle, pistol, sniper, shotgun, laser, explosion, reload), feedback (hitmarker, headshot, kill confirm, impact, ricochet, shatter), movement (footstep, jump, dash), abilities (ability cast, pickup, coin, shutdown, low health) and interface (click, confirm, deny, countdown, round start).
+**38 generators** in six groups: weapons (rifle, pistol, sniper, shotgun, laser, explosion, reload, minigun spin, railgun), feedback (hitmarker, headshot, kill confirm, impact, ricochet, shatter), movement (footstep, jump, dash), abilities (ability cast, pickup, coin, shutdown, low health, teleport, heal, poison), world (engine rev, door creak, splash, water drip, fire, wind, electric hum) and interface (click, confirm, deny, countdown, round start, text scroll).
 
 **Built for competitive games**
 - **Variations**: subtly different takes of one design (pitch, timing, filter, noise) so repeated sounds never machine-gun identically; export them as a pack
